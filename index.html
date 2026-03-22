@@ -833,10 +833,12 @@
                     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                     
                     let fullText = '';
+                    const pageTexts = [];
                     for (let i = 1; i <= pdf.numPages; i++) {
                         const page = await pdf.getPage(i);
                         const textContent = await page.getTextContent();
                         const pageText = textContent.items.map(item => item.str).join(' ');
+                        pageTexts.push(pageText);
                         fullText += pageText + '\n';
                     }
 
@@ -848,7 +850,49 @@
                     let docName;
                     
                     if (docType === 'DDT') {
-                        extractedData = extractDDTData(fullText);
+                        // DDT multi-pagina: estrai da ogni pagina e fondi
+                        if (pdf.numPages > 1) {
+                            console.log('DDT multi-pagina rilevato:', pdf.numPages, 'pagine');
+                            const allPageData = pageTexts.map((pt, idx) => {
+                                console.log('Parsing pagina', idx + 1);
+                                return extractDDTData(pt);
+                            });
+                            
+                            // Usa i dati header dalla prima pagina che li ha
+                            extractedData = { ...allPageData[0] };
+                            
+                            // Per campi header, se vuoti nella prima pagina, cerca nelle successive
+                            for (let i = 1; i < allPageData.length; i++) {
+                                const pd = allPageData[i];
+                                if (!extractedData.billTo && pd.billTo) extractedData.billTo = pd.billTo;
+                                if (!extractedData.shipTo && pd.shipTo) extractedData.shipTo = pd.shipTo;
+                                if (!extractedData.poNr && pd.poNr) extractedData.poNr = pd.poNr;
+                                if (!extractedData.gonNr && pd.gonNr) extractedData.gonNr = pd.gonNr;
+                                if ((!extractedData.ddtNumber || extractedData.ddtNumber === '') && pd.ddtNumber) extractedData.ddtNumber = pd.ddtNumber;
+                                if ((!extractedData.cigNr || extractedData.cigNr === 'NA') && pd.cigNr && pd.cigNr !== 'NA') extractedData.cigNr = pd.cigNr;
+                                if ((!extractedData.cupNr || extractedData.cupNr === 'NA') && pd.cupNr && pd.cupNr !== 'NA') extractedData.cupNr = pd.cupNr;
+                            }
+                            
+                            // Fondi tutti gli items da tutte le pagine
+                            extractedData.items = [];
+                            for (const pd of allPageData) {
+                                extractedData.items.push(...pd.items);
+                            }
+                            extractedData.itemCount = extractedData.items.length;
+                            
+                            // Raccogli tutti i DDT number per il messaggio
+                            const ddtNumbers = allPageData
+                                .map(pd => pd.ddtNumber)
+                                .filter(n => n && n.trim());
+                            if (ddtNumbers.length > 0) {
+                                extractedData.ddtNumber = ddtNumbers.join(', ');
+                            }
+                            
+                            console.log('DDT multi-pagina fuso:', extractedData.items.length, 'items totali da', pdf.numPages, 'pagine');
+                        } else {
+                            extractedData = extractDDTData(fullText);
+                        }
+                        
                         docName = 'DDT';
                         setDdtData(extractedData);
                         setPickData(null); // Reset pick data
@@ -1294,6 +1338,17 @@
                 finalY += 3;
                 doc.text('TEL +39 02 26001111 - FAX +39 02 26001413', 15, finalY);
 
+                // Aggiungi footer su tutte le pagine
+                const totalPages = doc.internal.getNumberOfPages();
+                for (let p = 1; p <= totalPages; p++) {
+                    doc.setPage(p);
+                    doc.setFontSize(7);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(100, 100, 100);
+                    doc.text(`Modulo Collaudo - GON ${collaudoData.gonNr || ''}`, 15, 290);
+                    doc.text(`${p} di ${totalPages}`, 195, 290, { align: 'right' });
+                }
+                
                 doc.save(`Collaudo_${collaudoData.gonNr || 'documento'}.pdf`);
                 setStatusMessage({ type: 'success', text: 'PDF Collaudo esportato con successo!' });
             };
@@ -1519,6 +1574,17 @@
                 doc.text('Società soggetta a controllo e coordinamento di General Electric Company', 15, finalY);
                 finalY += 3;
                 doc.text('TEL +39 02 26001111 - FAX +39 02 26001413', 15, finalY);
+
+                // Aggiungi footer su tutte le pagine
+                const totalPagesT = doc.internal.getNumberOfPages();
+                for (let p = 1; p <= totalPagesT; p++) {
+                    doc.setPage(p);
+                    doc.setFontSize(7);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(100, 100, 100);
+                    doc.text(`Modulo Training - GON ${trainingData.gonNr || ''}`, 15, 290);
+                    doc.text(`${p} di ${totalPagesT}`, 195, 290, { align: 'right' });
+                }
 
                 doc.save(`Training_${trainingData.gonNr || 'documento'}.pdf`);
                 setStatusMessage({ type: 'success', text: 'PDF Training esportato con successo!' });
