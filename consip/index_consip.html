@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GE Healthcare - Moduli CONSIP</title>
+    <script src="libs/react.development.js"></script>
+    <script src="libs/react-dom.development.js"></script>
+    <script src="libs/babel.min.js"></script>
+    <script src="libs/pdf.min.js"></script>
+    <script src="libs/jspdf.umd.min.js"></script>
+    <script src="libs/jspdf.plugin.autotable.min.js"></script>
+    <script src="libs/jszip.min.js"></script>
+    <script>
+        Babel.registerPreset("react-classic", {
+            presets: [[Babel.availablePresets["react"], { runtime: "classic" }]]
+        });
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+        .app-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header { background: white; padding: 30px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 20px; }
+        .ge-logo { width: 80px; height: 80px; background: #522398; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 32px; }
+        .header-text h1 { color: #522398; font-size: 28px; margin-bottom: 5px; }
+        .header-text p { color: #666; font-size: 14px; }
+        .upload-section { background: white; padding: 30px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .upload-area { border: 2px dashed #522398; border-radius: 8px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.3s; }
+        .upload-area:hover { background: #f9f5fc; border-color: #6b2fb5; }
+        .upload-area.dragover { background: #f0e6f7; border-color: #6b2fb5; }
+        .upload-icon { font-size: 48px; color: #522398; margin-bottom: 15px; }
+        .upload-text { color: #333; font-size: 16px; margin-bottom: 10px; }
+        .upload-hint { color: #999; font-size: 14px; }
+        .file-input { display: none; }
+        .status-message { padding: 15px; border-radius: 6px; margin-top: 15px; display: flex; align-items: center; gap: 10px; }
+        .status-message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status-message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status-message.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .tabs-container { background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+        .tabs-header { display: flex; border-bottom: 2px solid #e0e0e0; }
+        .tab { flex: 1; padding: 20px; background: #f5f5f5; border: none; cursor: pointer; font-size: 16px; font-weight: 600; color: #666; transition: all 0.3s; }
+        .tab:hover { background: #ebebeb; }
+        .tab.active { background: white; color: #522398; border-bottom: 3px solid #522398; }
+        .tab-content { padding: 30px; }
+        .form-section { margin-bottom: 30px; }
+        .form-section h3 { color: #522398; margin-bottom: 15px; font-size: 18px; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { color: #333; font-weight: 600; margin-bottom: 8px; font-size: 14px; }
+        .form-group input, .form-group textarea { padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; transition: border-color 0.3s; }
+        .form-group input:focus, .form-group textarea:focus { outline: none; border-color: #522398; }
+        .form-group textarea { min-height: 80px; resize: vertical; }
+        .items-table { overflow-x: auto; margin-top: 20px; }
+        .items-table table { width: 100%; border-collapse: collapse; background: white; }
+        .items-table th { background: #522398; color: white; padding: 12px; text-align: left; font-weight: 600; font-size: 13px; }
+        .items-table td { padding: 8px 10px; border: 1px solid #e0e0e0; }
+        .items-table input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+        .items-table input:focus { outline: none; border-color: #522398; }
+        .add-item-btn { background: #522398; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; transition: background 0.3s; margin-top: 15px; }
+        .add-item-btn:hover { background: #6b2fb5; }
+        .delete-btn { background: #dc3545; color: white; padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+        .delete-btn:hover { background: #c82333; }
+        .export-section { margin-top: 30px; padding-top: 20px; border-top: 2px solid #e0e0e0; }
+        .export-btn { background: #28a745; color: white; padding: 15px 30px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600; transition: background 0.3s; }
+        .export-btn:hover { background: #218838; }
+        .export-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .checkbox-group { display: flex; gap: 20px; margin-top: 15px; flex-wrap: wrap; }
+        .checkbox-group label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .checkbox-group input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        .zip-section { background: white; padding: 24px 30px; border-radius: 8px; margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 2px solid #1a5276; }
+        .zip-btn { background: #1a5276; color: white; padding: 18px 40px; border: none; border-radius: 8px; cursor: pointer; font-size: 18px; font-weight: 700; transition: background 0.3s; width: 100%; letter-spacing: 0.5px; }
+        .zip-btn:hover { background: #21618c; }
+        .zip-btn:disabled { background: #ccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel" data-presets="react-classic">
+        const { useState, useRef } = React;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
+
+        /* ===== UTILITY ===== */
+        const formatDateIT = (d) => {
+            if (!d) return '';
+            if (d.includes('/')) return d;
+            const p = d.split('-');
+            return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : d;
+        };
+        const checkPage = (doc, y, need) => (y + need > 280) ? (doc.addPage(), 20) : y;
+        const wrapText = (doc, txt, x, y, maxW, lh) => {
+            if (!txt) return y;
+            const lines = doc.splitTextToSize(txt, maxW);
+            for (const l of lines) { if (y > 280) { doc.addPage(); y = 20; } doc.text(l, x, y); y += lh; }
+            return y;
+        };
+
+        /* ===== PDF HELPERS ===== */
+        const addFooters = (doc, odaNum, moduleName) => {
+            const totalPages = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                doc.setFontSize(7); doc.setFont(undefined, 'normal'); doc.setTextColor(120);
+                doc.text('OdA: ' + (odaNum || ''), 15, 290);
+                doc.text(moduleName + ' - Pag. ' + i + ' di ' + totalPages, 195, 290, { align: 'right' });
+                doc.setTextColor(0);
+            }
+        };
+
+        const writePDFHeader = (doc, title) => {
+            doc.setFontSize(10); doc.setFont(undefined, 'bold');
+            doc.text('GE Medical Systems Italia S.p.A.', 15, 15);
+            doc.setFontSize(12); doc.text(title, 15, 22);
+            doc.setFontSize(8); doc.setFont(undefined, 'normal');
+            doc.text('GE Medical Systems Italia S.p.A', 15, 28);
+            doc.text('Via Galeno 36, 20126 Milano', 15, 32);
+            doc.text('Tel: +39 02 26001 111', 15, 36);
+            doc.setDrawColor(0); doc.setLineWidth(0.5); doc.rect(120, 10, 85, 25);
+            doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.text('CONVENZIONE CONSIP', 122, 16);
+            doc.setFontSize(8); doc.setFont(undefined, 'normal');
+            doc.text('AQ Dotazioni tecnologiche per le Case di Comunità', 122, 21);
+            doc.setFont(undefined, 'bold'); doc.text('LOTTO 7 - Ecografo', 122, 28);
+        };
+
+        const writeCliente = (doc, data, extraRight) => {
+            let y = 45;
+            // Cliente (bill to) a SINISTRA
+            doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.text('Cliente', 15, y);
+            // Destinazione (ship to) a DESTRA
+            doc.text('Destinazione', 110, y);
+            y += 5;
+            doc.setFontSize(8); doc.setFont(undefined, 'normal');
+            // Scrivi bill to a sinistra (max 85mm)
+            const billLines = doc.splitTextToSize(data.billTo || '', 85);
+            const shipLines = doc.splitTextToSize(data.shipTo || '', 85);
+            const maxLines = Math.max(billLines.length, shipLines.length);
+            for (let i = 0; i < maxLines; i++) {
+                if (y > 280) { doc.addPage(); y = 20; }
+                if (i < billLines.length) doc.text(billLines[i], 15, y);
+                if (i < shipLines.length) doc.text(shipLines[i], 110, y);
+                y += 4;
+            }
+            y += 4;
+            doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.text('Dettagli Ordine', 15, y); y += 5;
+            doc.setFontSize(7); doc.setFont(undefined, 'normal');
+            const left = [
+                ['Data consegna:', formatDateIT(data.dataConsegna)],
+                ['Num. OdA:', data.numOdA],
+                ['Data Ordine:', formatDateIT(data.dataOrdine)],
+                ['Vs. Protocollo:', data.vsProtocollo]
+            ];
+            const right = [
+                ['CIG:', data.cigNr],
+                ['CUP:', data.cupNr],
+                ['Ns. Prot. e GON:', data.nsProtocollo],
+                ['Nr. Prog. Install GE:', '____________________']
+            ];
+            if (extraRight) extraRight.forEach(r => right.push(r));
+            const sy = y;
+            left.forEach(([l, v]) => { doc.text(l, 15, y); doc.text(v || '', 52, y); y += 4; });
+            let yr = sy;
+            right.forEach(([l, v]) => { doc.text(l, 110, yr); doc.text(v || '', 148, yr); yr += 4; });
+            y = Math.max(y, yr) + 4;
+            return y;
+        };
+
+        const writeItemsTable = (doc, items, y, hdr) => {
+            y = checkPage(doc, y, 25);
+            doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.text(hdr, 15, y); y += 5;
+            const body = items.map(i => [i.qtaOrdine || '', i.qty || '', i.codiceConsip, i.codiceH, i.descrizione, i.serialNumber]);
+            doc.autoTable({
+                startY: y,
+                head: [['Q.tà ordine', 'Q.tà collaud.', 'Codice Consip', 'Codice Hxx', 'Descrizione', 'Nr. serie']],
+                body: body,
+                styles: { fontSize: 7, cellPadding: 2 },
+                headStyles: { fillColor: [82, 35, 152], textColor: 255, fontStyle: 'bold' },
+                columnStyles: { 0: { cellWidth: 15 }, 1: { cellWidth: 15 }, 2: { cellWidth: 35 }, 3: { cellWidth: 25 }, 4: { cellWidth: 55 }, 5: { cellWidth: 35 } }
+            });
+            return doc.lastAutoTable.finalY;
+        };
+
+        /* ===== COMPONENTI CONDIVISI (FUORI DA APP) ===== */
+        const ClienteForm = ({ sharedData, updateSharedField }) => (
+            <div className="form-section">
+                <h3>Cliente</h3>
+                <div className="form-grid">
+                    <div className="form-group">
+                        <label>BILL TO</label>
+                        <textarea value={sharedData.billTo} onChange={(e) => updateSharedField('billTo', e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                        <label>Destinazione (SHIP TO)</label>
+                        <textarea value={sharedData.shipTo} onChange={(e) => updateSharedField('shipTo', e.target.value)} />
+                    </div>
+                </div>
+            </div>
+        );
+
+        const DettagliForm = ({ sharedData, updateSharedField, dataLabel }) => (
+            <div className="form-section">
+                <h3>Dettagli Ordine</h3>
+                <div className="form-grid">
+                    <div className="form-group">
+                        <label>{dataLabel || 'Data consegna'}</label>
+                        <input type="date" value={sharedData.dataConsegna} onChange={(e) => updateSharedField('dataConsegna', e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                        <label>Num. OdA progressivo</label>
+                        <input type="text" placeholder="num ordine MEPA - portale CONSIP" value={sharedData.numOdA} onChange={(e) => updateSharedField('numOdA', e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                        <label>Data Ordine OdA</label>
+                        <input type="date" value={sharedData.dataOrdine} onChange={(e) => updateSharedField('dataOrdine', e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                        <label>Vs. Protocollo</label>
+                        <input type="text" placeholder="numero NSO" value={sharedData.vsProtocollo} onChange={(e) => updateSharedField('vsProtocollo', e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                        <label>CIG</label>
+                        <input type="text" value={sharedData.cigNr} onChange={(e) => updateSharedField('cigNr', e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                        <label>CUP</label>
+                        <input type="text" value={sharedData.cupNr} onChange={(e) => updateSharedField('cupNr', e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                        <label>Ns. Protocollo e GON</label>
+                        <input type="text" value={sharedData.nsProtocollo} onChange={(e) => updateSharedField('nsProtocollo', e.target.value)} />
+                    </div>
+                </div>
+            </div>
+        );
+
+        const ItemsTable = ({ items, updateItem, deleteItem, addItem, onCopyQty, onMultiply }) => {
+            const customRef = useRef(null);
+            return (
+            <div className="form-section">
+                <h3>Articoli</h3>
+                <div style={{display:'flex',gap:'8px',alignItems:'center',marginBottom:'10px',flexWrap:'wrap'}}>
+                    <button onClick={onCopyQty} style={{background:'#522398',color:'white',border:'none',borderRadius:'6px',padding:'8px 16px',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>
+                        📋 Copia Q.tà collaud. → ordine
+                    </button>
+                    <span style={{color:'#666',fontSize:'13px',marginLeft:'6px'}}>Moltiplica:</span>
+                    {[1,2,3,4,5].map(n => (
+                        <button key={n} onClick={() => onMultiply(n)}
+                            style={{background:'white',color:'#522398',border:'2px solid #522398',borderRadius:'6px',padding:'6px 12px',cursor:'pointer',fontSize:'13px',fontWeight:'700',minWidth:'36px'}}>
+                            x{n}
+                        </button>
+                    ))}
+                    <span style={{color:'#ccc',fontSize:'16px'}}>|</span>
+                    <input ref={customRef} type="number" min="1" max="999" placeholder="x..."
+                        style={{width:'60px',padding:'6px 8px',border:'2px solid #522398',borderRadius:'6px',fontSize:'13px',textAlign:'center'}}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { const v = parseInt(customRef.current.value); if (v > 0) onMultiply(v); }}} />
+                    <button onClick={() => { const v = parseInt(customRef.current?.value); if (v > 0) onMultiply(v); else alert('Inserisci un numero'); }}
+                        style={{background:'#522398',color:'white',border:'none',borderRadius:'6px',padding:'6px 14px',cursor:'pointer',fontSize:'13px',fontWeight:'600'}}>
+                        Applica
+                    </button>
+                </div>
+                <div className="items-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style={{width:'60px'}}>Q.tà<br/>ordine</th>
+                                <th style={{width:'60px'}}>Q.tà<br/>collaud.</th>
+                                <th>Codice Consip</th>
+                                <th>Codice Hxx</th>
+                                <th>Descrizione</th>
+                                <th>Nr. di serie</th>
+                                <th style={{width:'70px'}}>Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {items.map((item, i) => (
+                                <tr key={i}>
+                                    <td><input type="text" value={item.qtaOrdine} onChange={(e) => updateItem(i, 'qtaOrdine', e.target.value)} /></td>
+                                    <td><input type="text" value={item.qty} onChange={(e) => updateItem(i, 'qty', e.target.value)} /></td>
+                                    <td><input type="text" value={item.codiceConsip} onChange={(e) => updateItem(i, 'codiceConsip', e.target.value)} /></td>
+                                    <td><input type="text" value={item.codiceH} onChange={(e) => updateItem(i, 'codiceH', e.target.value)} /></td>
+                                    <td><input type="text" value={item.descrizione} onChange={(e) => updateItem(i, 'descrizione', e.target.value)} /></td>
+                                    <td><input type="text" value={item.serialNumber} onChange={(e) => updateItem(i, 'serialNumber', e.target.value)} /></td>
+                                    <td><button className="delete-btn" onClick={() => deleteItem(i)}>Elimina</button></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                <button className="add-item-btn" onClick={addItem}>+ Aggiungi Opzione Aggiuntiva</button>
+            </div>
+            );
+        };
+
+        /* ===== APP ===== */
+        const App = () => {
+            const [activeTab, setActiveTab] = useState(0);
+            const [isLoading, setIsLoading] = useState(false);
+            const [statusMessage, setStatusMessage] = useState(null);
+            const [ddtData, setDdtData] = useState(null);
+
+            const [sharedData, setSharedData] = useState({
+                billTo: '', shipTo: '', dataConsegna: '', numOdA: '', dataOrdine: '',
+                vsProtocollo: '', cigNr: '', cupNr: '', nsProtocollo: '', gonNr: '',
+                items: []
+            });
+            const [installazioneExtra, setInstallazioneExtra] = useState({
+                dichiarazioneConformita: true, schedaMisure: false, altre: false
+            });
+            const [collaudoExtra, setCollaudoExtra] = useState({
+                garanzia: '', dichiarazioneConformita: true, schedaMisure: false, altre: false
+            });
+
+            /* --- DDT PARSING --- */
+            const extractDDTData = (text) => {
+                const data = { billTo: '', shipTo: '', cigNr: '', cupNr: '', poNr: '', gonNr: '', ddtNumber: '', items: [] };
+
+                // BILL TO
+                const ip = text.indexOf('Intestatario Fattura');
+                if (ip > 0) {
+                    const a = text.substring(ip + 20);
+                    const u = a.split('Codice Fiscale')[0];
+                    const nums = [...u.matchAll(/\b(\d{7,8})\b/g)];
+                    if (nums.length > 0) {
+                        const ln = nums[nums.length - 1];
+                        const ac = u.substring(ln.index + ln[1].length);
+                        const m = ac.match(/\s*([A-Z][^]*?Italy)/i);
+                        if (m) data.billTo = m[1].replace(/\s+/g, ' ').trim();
+                    }
+                }
+
+                // SHIP TO
+                const sm = text.match(/Destinazione\s+\d+\s+([^]+?)(?:Ordine Cliente|DDT Numero|SO Numero)/is);
+                if (sm) data.shipTo = sm[1].replace(/\s+/g, ' ').trim();
+
+                // PO, GON, DDT
+                const pm = text.match(/Ordine Cliente\s+([A-Z0-9\-]+)/i);
+                if (pm) data.poNr = pm[1].trim();
+                const gm = text.match(/SO Numero\s+(\d+)/i);
+                if (gm) data.gonNr = gm[1].trim();
+                const dm = text.match(/DDT Numero\s+(\d+)/i);
+                if (dm) data.ddtNumber = dm[1].trim();
+
+                // CIG e CUP
+                const rs = text.match(/REFERENTE\s+CIG\s+CUP\s+RESA\s+CAUSALE DEL TRASPORTO\s+([^]+?)(?:RIGA|CODICE ARTICOLO)/is);
+                if (rs) {
+                    const tk = rs[1].split(/\s+/).filter(t => t.length >= 2)
+                        .map(t => t.replace(/[(),]/g, ''))
+                        .filter(t => { if (t === 'NA') return true; if (/[a-z]/.test(t)) return false; return /^[A-Z0-9]{5,}$/.test(t); });
+                    if (tk.length >= 2) { data.cigNr = tk[0]; data.cupNr = tk[1]; }
+                }
+
+                // ITEMS - parsing basato sulla struttura tabellare del DDT
+                // Il DDT ha righe tipo: "1.1 H48992CS LOGIQ F R3 EA 1 6310246WX0"
+                // I parent (es 6.1, 10.1) NON hanno EA + quantità
+                // I child (es 6.1..1, 10.1..1) HANNO EA + quantità
+                // Trova TUTTE le sezioni articoli nel testo (possono esserci più DDT nel PDF).
+                // Filtra le sezioni che contengono solo articoli eDelivery software: non devono comparire nei moduli.
+                const allSections = [...text.matchAll(/(?:MATRICOLA|LOTTO)\s+([\s\S]+?)(?:COMMENTI|NUMERO COLLI|Referente)/gi)];
+                const realSections = allSections.filter(m => !/edelivery/i.test(m[1]));
+                const ism = realSections.length > 0 ? [null, realSections.map(m => m[1]).join('\n')] : null;
+                if (ism) {
+                    const itemsText = ism[1];
+                    
+                    // Pattern specifico per codici articolo GE: 
+                    // Hxxxxx + 2 lettere (H48992CS) oppure codice alfanumerico tipo H95003US
+                    // Cerchiamo: numero_riga codice_articolo descrizione EA quantità [matricola]
+                    // Il codice articolo GE inizia con H o lettera + almeno 4 cifre + 2 lettere finali
+                    const geCodePattern = /\b(H\d{3,5}[A-Z]{1,2})\b/g;
+                    const geCodes = [];
+                    let gcm;
+                    while ((gcm = geCodePattern.exec(itemsText)) !== null) {
+                        geCodes.push({ code: gcm[1], pos: gcm.index, endPos: gcm.index + gcm[1].length });
+                    }
+                    
+                    // Per ogni codice GE, prendi il segmento fino al prossimo codice GE
+                    for (let i = 0; i < geCodes.length; i++) {
+                        const { code, endPos } = geCodes[i];
+                        const nextPos = i < geCodes.length - 1 ? geCodes[i + 1].pos : itemsText.length;
+                        const segment = itemsText.substring(endPos, nextPos).trim();
+                        
+                        // Cerca EA + quantità nel segmento, poi cattura TUTTO dopo la qty per i seriali
+                        const eaMatch = segment.match(/^(.+?)\s+EA\s+(\d+)([\s\S]*?)$/s);
+                        
+                        if (eaMatch) {
+                            let description = eaMatch[1].trim().replace(/\s+/g, ' ');
+                            const qty = parseInt(eaMatch[2]);
+                            const afterQty = (eaMatch[3] || '').trim();
+                            
+                            // Ignora custom configuration
+                            if (description.toLowerCase().includes('custom configuration')) continue;
+                            
+                            // Pulizia descrizione: rimuovi numeri riga residui
+                            description = description.replace(/^\d+(\.\d+)*(\.{2}\d+)?\s+/, '').trim();
+                            
+                            // Estrai tutti i seriali dal testo dopo la quantità
+                            // Pattern seriale: alfanumerico 6+ chars (es. 6310144WX0, 1813417WX1)
+                            const serialPattern = /\b([A-Z0-9]{6,}[A-Z]\d)\b/gi;
+                            const serials = [];
+                            let sm;
+                            while ((sm = serialPattern.exec(afterQty)) !== null) {
+                                const sn = sm[1];
+                                // Escludi falsi positivi
+                                if (/^(COMMENTI|NUMERO|PESO|ASPETTO|LOTTO)/.test(sn)) continue;
+                                if (/^\d+\.\d+/.test(sn)) continue;
+                                serials.push(sn);
+                            }
+                            
+                            // Se ci sono seriali multipli: split in righe separate (1 per seriale)
+                            if (serials.length > 1) {
+                                serials.forEach(sn => {
+                                    data.items.push({ itemNumber: code, description, qty: '1', serialNumber: sn });
+                                });
+                            } else {
+                                // Seriale singolo o nessuno: una riga con la qty originale
+                                data.items.push({ 
+                                    itemNumber: code, description, 
+                                    qty: String(qty), 
+                                    serialNumber: serials.length === 1 ? serials[0] : '' 
+                                });
+                            }
+                        }
+                        // Se non ha EA+qty -> e' un parent, lo ignoriamo
+                    }
+                }
+                return data;
+            };
+
+            const parsePDF = async (file) => {
+                setIsLoading(true);
+                setStatusMessage({ type: 'info', text: 'Analisi del documento in corso...' });
+                try {
+                    const ab = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+                    let ft = '';
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const pg = await pdf.getPage(i);
+                        const tc = await pg.getTextContent();
+                        ft += tc.items.map(it => it.str).join(' ') + '\n';
+                    }
+                    const ed = extractDDTData(ft);
+                    setDdtData(ed);
+                    
+                    // Configurazione CONSIP standard Lotto 7 - Ecografo
+                    const CONSIP_BASE_CODES = new Set([
+                        'H48992CS', 'H45041DL', 'H40402LY', 'H40462LA', 'H48542DR',
+                        'H48442BC', 'H48032DR', 'H48122DJ', 'H48392BP', 'H48962CG',
+                        'H48122DH', 'H48052BG', 'H41402LS', 'H48732AK', 'H48502AW'
+                    ]);
+                    
+                    setSharedData(prev => ({
+                        ...prev,
+                        billTo: ed.billTo, shipTo: ed.shipTo,
+                        cigNr: ed.cigNr, cupNr: ed.cupNr,
+                        gonNr: ed.gonNr, nsProtocollo: ed.gonNr,
+                        numOdA: ed.poNr,
+                        items: (() => {
+                            // Separa base e opzionali, base prima e opzionali in fondo
+                            const base = ed.items.filter(it => CONSIP_BASE_CODES.has(it.itemNumber));
+                            const extra = ed.items.filter(it => !CONSIP_BASE_CODES.has(it.itemNumber));
+                            const mapped = base.map(it => ({
+                                qtaOrdine: '', qty: it.qty,
+                                codiceConsip: it.itemNumber === 'H48992CS' ? 'AQ-CASECOM-L7-GE' : '',
+                                codiceH: it.itemNumber,
+                                descrizione: it.description,
+                                serialNumber: it.serialNumber
+                            }));
+                            extra.forEach(it => mapped.push({
+                                qtaOrdine: '', qty: it.qty,
+                                codiceConsip: 'AQ-CASECOM-DE-DE-L7-GE',
+                                codiceH: it.itemNumber,
+                                descrizione: it.description,
+                                serialNumber: it.serialNumber
+                            }));
+                            return mapped;
+                        })()
+                    }));
+                    setStatusMessage({ type: 'success', text: 'DDT caricato! ' + ed.items.length + ' articoli trovati.' });
+                } catch (e) {
+                    console.error(e);
+                    setStatusMessage({ type: 'error', text: "Errore durante l'analisi." });
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const handleFileUpload = (e) => {
+                const f = e.target.files[0];
+                if (f && f.type === 'application/pdf') parsePDF(f);
+                else setStatusMessage({ type: 'error', text: 'Carica un PDF valido.' });
+            };
+            const handleDragOver = (e) => { e.preventDefault(); e.currentTarget.classList.add('dragover'); };
+            const handleDragLeave = (e) => { e.preventDefault(); e.currentTarget.classList.remove('dragover'); };
+            const handleDrop = (e) => {
+                e.preventDefault(); e.currentTarget.classList.remove('dragover');
+                const f = e.dataTransfer.files[0];
+                if (f && f.type === 'application/pdf') parsePDF(f);
+            };
+
+            const updateSharedField = (f, v) => setSharedData(p => ({ ...p, [f]: v }));
+            const updateItem = (i, f, v) => {
+                setSharedData(p => {
+                    const ni = [...p.items]; ni[i] = { ...ni[i], [f]: v };
+                    return { ...p, items: ni };
+                });
+            };
+            const addItem = () => {
+                setSharedData(p => ({
+                    ...p, items: [...p.items, {
+                        qtaOrdine: '', qty: '', codiceConsip: 'AQ-CASECOM-DE-DE-L7-GE',
+                        codiceH: '', descrizione: '', serialNumber: ''
+                    }]
+                }));
+            };
+            const deleteItem = (i) => { setSharedData(p => ({ ...p, items: p.items.filter((_, x) => x !== i) })); };
+            
+            // Copia qty collaudo → qty ordine per tutti gli items
+            const copyQtyToOrdine = () => {
+                setSharedData(p => ({
+                    ...p,
+                    items: p.items.map(item => ({ ...item, qtaOrdine: item.qty }))
+                }));
+            };
+            // Moltiplica qty ordine per un fattore (basato su qty collaudo)
+            const multiplyOrdine = (factor) => {
+                setSharedData(p => ({
+                    ...p,
+                    items: p.items.map(item => {
+                        const base = parseInt(item.qty) || 0;
+                        return { ...item, qtaOrdine: String(base * factor) };
+                    })
+                }));
+            };
+
+            const updateInstallazioneExtra = (f, v) => setInstallazioneExtra(p => ({ ...p, [f]: v }));
+            const updateCollaudoExtra = (f, v) => setCollaudoExtra(p => ({ ...p, [f]: v }));
+
+            /* === VALIDAZIONE COMUNE === */
+            const validateExport = () => {
+                if (!sharedData.billTo || !sharedData.shipTo || !sharedData.dataConsegna || !sharedData.numOdA || !sharedData.dataOrdine || !sharedData.vsProtocollo || !sharedData.cigNr || !sharedData.cupNr || !sharedData.nsProtocollo) {
+                    alert('Compila tutti i campi obbligatori (Cliente, Destinazione, Dettagli Ordine) prima di esportare!'); return false;
+                }
+                if (sharedData.items.length === 0) { alert('Aggiungi almeno un articolo!'); return false; }
+                if (sharedData.items.some(it => !it.qtaOrdine || it.qtaOrdine.trim() === '')) { alert('Compila tutte le Q.tà ordine prima di esportare!'); return false; }
+                return true;
+            };
+
+            /* === BUILD INSTALLAZIONE === */
+            const buildInstallazioneDoc = () => {
+                const { jsPDF } = window.jspdf; const doc = new jsPDF();
+                writePDFHeader(doc, 'Verbale di Installazione del Sistema');
+                let y = writeCliente(doc, sharedData, []);
+                y = writeItemsTable(doc, sharedData.items, y, "Si \u00e8 proceduto all'installazione delle seguenti apparecchiature:");
+                y = checkPage(doc, y + 10, 40);
+                doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.text('ALLEGATI:', 15, y); y += 5;
+                doc.setFontSize(8); doc.setFont(undefined, 'normal');
+                const al = [];
+                if (installazioneExtra.dichiarazioneConformita) al.push("DICHIARAZIONE DI CONFORMITA'");
+                if (installazioneExtra.schedaMisure) al.push('SCHEDA MISURE');
+                if (installazioneExtra.altre) al.push('ALTRE');
+                if (al.length > 0) doc.text('[X] ' + al.join(', '), 15, y);
+                y += 8; doc.setFontSize(7);
+                doc.text("Il Cliente provvedera' a verificare l'efficienza dell'impianto di terra e monte del Sistema ed a mantenerla nel tempo.", 15, y);
+                y += 10; doc.setFontSize(8); doc.setFont(undefined, 'normal');
+                doc.text('Tecnico installatore: ____________________________', 15, y);
+                doc.text("Incaricato ente per l'installazione: ____________________________", 105, y);
+                y += 5; doc.text('Data: ____/____/________', 15, y);
+                y += 12; y = checkPage(doc, y, 15);
+                doc.setFontSize(8); doc.setFont(undefined, 'bold');
+                doc.text('*Per la Casa Fornitrice', 15, y); doc.text('*Timbro e firma del Cliente', 120, y);
+                addFooters(doc, sharedData.numOdA, 'Verbale Installazione');
+                return doc;
+            };
+            const exportPDF = () => { if (!validateExport()) return; const gon = sharedData.gonNr || 'XXXXX'; buildInstallazioneDoc().save('Verbale_Installazione_GON_' + gon + '.pdf'); };
+
+            /* === BUILD COLLAUDO === */
+            const buildCollaudoDoc = () => {
+                const { jsPDF } = window.jspdf; const doc = new jsPDF();
+                writePDFHeader(doc, 'Verbale di Collaudo');
+                let y = writeCliente(doc, sharedData, [['Garanzia:', collaudoExtra.garanzia || '24 mesi']]);
+                y = writeItemsTable(doc, sharedData.items, y, "Si \u00e8 proceduto al collaudo ed accettazione delle seguenti apparecchiature:");
+                y = checkPage(doc, y + 10, 50);
+                doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.text('ALLEGATI:', 15, y); y += 5;
+                doc.setFontSize(8); doc.setFont(undefined, 'normal');
+                const al = [];
+                if (collaudoExtra.dichiarazioneConformita) al.push("DICHIARAZIONE DI CONFORMITA'");
+                if (collaudoExtra.schedaMisure) al.push('SCHEDA MISURE');
+                if (collaudoExtra.altre) al.push('ALTRE');
+                if (al.length > 0) doc.text('[X] ' + al.join(', '), 15, y);
+                y += 10; doc.setFontSize(9); doc.setFont(undefined, 'bold');
+                doc.text('ESITO DEL COLLAUDO: POSITIVO', 15, y);
+                doc.setFontSize(8); doc.setFont(undefined, 'normal');
+                doc.text('Data collaudo: ____/____/________', 120, y);
+                y += 8; doc.setFontSize(7);
+                doc.text('Le apparecchiature sopra indicate risultano conformi alle specifiche tecniche previste dal contratto.', 15, y); y += 4;
+                doc.text('Il collaudo ha avuto esito positivo e le apparecchiature vengono accettate dal Cliente.', 15, y);
+                y += 12; y = checkPage(doc, y, 15);
+                doc.setFontSize(8); doc.setFont(undefined, 'bold');
+                doc.text('*Per la Casa Fornitrice', 15, y); doc.text('*Timbro e firma del Cliente', 120, y);
+                addFooters(doc, sharedData.numOdA, 'Verbale Collaudo');
+                return doc;
+            };
+            const exportCollaudoPDF = () => { if (!validateExport()) return; const gon = sharedData.gonNr || 'XXXXX'; buildCollaudoDoc().save('Verbale_Collaudo_GON_' + gon + '.pdf'); };
+
+            /* === BUILD FORMAZIONE === */
+            const buildFormazioneDoc = () => {
+                const { jsPDF } = window.jspdf; const doc = new jsPDF();
+                writePDFHeader(doc, 'Verbale di Primo Avvio e Formazione');
+                let y = writeCliente(doc, sharedData, []);
+                y = writeItemsTable(doc, sharedData.items, y, 'Apparecchiature oggetto della formazione:');
+                y = checkPage(doc, y + 10, 60);
+                doc.setFontSize(9); doc.setFont(undefined, 'bold');
+                doc.text('Formatore (tecnico GE Healthcare):', 15, y); y += 5;
+                doc.setFontSize(8); doc.setFont(undefined, 'normal');
+                doc.text('Nome: ______________________________   Cognome: ______________________________', 15, y);
+                y += 10; doc.setFontSize(9); doc.setFont(undefined, 'bold');
+                doc.text('Personale che ha ricevuto la formazione:', 15, y); y += 6;
+                doc.setFontSize(8); doc.setFont(undefined, 'normal');
+                for (let pp = 0; pp < 2; pp++) {
+                    y = checkPage(doc, y, 20);
+                    doc.text('Nome: ______________________________   Cognome: ______________________________', 15, y);
+                    y += 5;
+                    doc.text('Ruolo: ______________________________   Firma: ______________________________', 15, y);
+                    y += 10;
+                }
+                y += 12; y = checkPage(doc, y, 30);
+                doc.setFontSize(8); doc.setFont(undefined, 'normal');
+                doc.text('Data: ____/____/________       Ora: ______:______', 15, y);
+                y += 8; doc.setFontSize(7);
+                doc.text("Il personale sopra indicato dichiara di aver ricevuto adeguata formazione sull'utilizzo delle apparecchiature.", 15, y);
+                y += 12; y = checkPage(doc, y, 15);
+                doc.setFontSize(8); doc.setFont(undefined, 'bold');
+                doc.text('*Per la Casa Fornitrice', 15, y); doc.text('*Timbro e firma del Cliente', 120, y);
+                addFooters(doc, sharedData.numOdA, 'Verbale Primo Avvio e Formazione');
+                return doc;
+            };
+            const exportFormazionePDF = () => { if (!validateExport()) return; const gon = sharedData.gonNr || 'XXXXX'; buildFormazioneDoc().save('Verbale_Primo_Avvio_Formazione_GON_' + gon + '.pdf'); };
+
+            /* === EXPORT TUTTI IN ZIP === */
+            const exportAllZip = async () => {
+                if (!validateExport()) return;
+                const gon = sharedData.gonNr || 'XXXXX';
+                const zip = new JSZip();
+                zip.file('Verbale_Installazione_GON_' + gon + '.pdf', buildInstallazioneDoc().output('arraybuffer'));
+                zip.file('Verbale_Collaudo_GON_' + gon + '.pdf', buildCollaudoDoc().output('arraybuffer'));
+                zip.file('Verbale_Primo_Avvio_Formazione_GON_' + gon + '.pdf', buildFormazioneDoc().output('arraybuffer'));
+                const blob = await zip.generateAsync({ type: 'blob' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'Verbali_GON_' + gon + '.zip';
+                a.click();
+                URL.revokeObjectURL(a.href);
+            };
+
+            /* === RENDER === */
+            return (
+                <div className="app-container">
+                    <div className="header">
+                        <div className="ge-logo">GE</div>
+                        <div className="header-text">
+                            <h1>GE Healthcare</h1>
+                            <p>Generatore Moduli CONSIP - Case di Comunità</p>
+                        </div>
+                    </div>
+
+                    <div className="upload-section">
+                        <h2 style={{ marginBottom: '20px', color: '#522398' }}>1. Carica DDT (Documento di Trasporto)</h2>
+                        <div className="upload-area" onClick={() => document.getElementById('file-input').click()}
+                            onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+                            <div className="upload-icon">📄</div>
+                            <div className="upload-text">{isLoading ? 'Analisi in corso...' : 'Clicca o trascina qui il DDT'}</div>
+                            <div className="upload-hint">Formati supportati: PDF</div>
+                        </div>
+                        <input id="file-input" type="file" className="file-input" accept=".pdf" onChange={handleFileUpload} />
+                        {statusMessage && <div className={`status-message ${statusMessage.type}`}>{statusMessage.text}</div>}
+                    </div>
+
+                    {ddtData && (
+                        <div className="tabs-container">
+                            <div className="tabs-header">
+                                <button className={`tab ${activeTab === 0 ? 'active' : ''}`} onClick={() => setActiveTab(0)}>📋 Verbale Installazione</button>
+                                <button className={`tab ${activeTab === 1 ? 'active' : ''}`} onClick={() => setActiveTab(1)}>✅ Verbale Collaudo</button>
+                                <button className={`tab ${activeTab === 2 ? 'active' : ''}`} onClick={() => setActiveTab(2)}>🎓 Verbale Formazione</button>
+                            </div>
+
+                            <div className="tab-content">
+                                {activeTab === 0 && (
+                                    <>
+                                        <h2 style={{ color: '#522398', marginBottom: '20px' }}>Verbale di Installazione del Sistema</h2>
+                                        <ClienteForm sharedData={sharedData} updateSharedField={updateSharedField} />
+                                        <DettagliForm sharedData={sharedData} updateSharedField={updateSharedField} />
+                                        <ItemsTable items={sharedData.items} updateItem={updateItem} deleteItem={deleteItem} addItem={addItem} onCopyQty={copyQtyToOrdine} onMultiply={multiplyOrdine} />
+                                        <div className="form-section">
+                                            <h3>Allegati</h3>
+                                            <div className="checkbox-group">
+                                                <label><input type="checkbox" checked={installazioneExtra.dichiarazioneConformita}
+                                                    onChange={(e) => updateInstallazioneExtra('dichiarazioneConformita', e.target.checked)} /> DICHIARAZIONE DI CONFORMITA'</label>
+                                                <label><input type="checkbox" checked={installazioneExtra.schedaMisure}
+                                                    onChange={(e) => updateInstallazioneExtra('schedaMisure', e.target.checked)} /> SCHEDA MISURE</label>
+                                                <label><input type="checkbox" checked={installazioneExtra.altre}
+                                                    onChange={(e) => updateInstallazioneExtra('altre', e.target.checked)} /> ALTRE</label>
+                                            </div>
+                                        </div>
+                                        <div className="export-section">
+                                            <button className="export-btn" onClick={exportPDF} disabled={sharedData.items.length === 0}>
+                                                📥 Esporta PDF Verbale Installazione
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+
+                                {activeTab === 1 && (
+                                    <>
+                                        <h2 style={{ color: '#522398', marginBottom: '20px' }}>Verbale di Collaudo</h2>
+                                        <ClienteForm sharedData={sharedData} updateSharedField={updateSharedField} />
+                                        <DettagliForm sharedData={sharedData} updateSharedField={updateSharedField} />
+                                        <div className="form-section">
+                                            <div className="form-grid">
+                                                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                                    <label>Garanzia</label>
+                                                    <input type="text" placeholder="Lasciare vuoto per 24 mesi (default). Altrimenti specificare durata."
+                                                        value={collaudoExtra.garanzia} onChange={(e) => updateCollaudoExtra('garanzia', e.target.value)} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <ItemsTable items={sharedData.items} updateItem={updateItem} deleteItem={deleteItem} addItem={addItem} onCopyQty={copyQtyToOrdine} onMultiply={multiplyOrdine} />
+                                        <div className="form-section">
+                                            <h3>Allegati</h3>
+                                            <div className="checkbox-group">
+                                                <label><input type="checkbox" checked={collaudoExtra.dichiarazioneConformita}
+                                                    onChange={(e) => updateCollaudoExtra('dichiarazioneConformita', e.target.checked)} /> DICHIARAZIONE DI CONFORMITA'</label>
+                                                <label><input type="checkbox" checked={collaudoExtra.schedaMisure}
+                                                    onChange={(e) => updateCollaudoExtra('schedaMisure', e.target.checked)} /> SCHEDA MISURE</label>
+                                                <label><input type="checkbox" checked={collaudoExtra.altre}
+                                                    onChange={(e) => updateCollaudoExtra('altre', e.target.checked)} /> ALTRE</label>
+                                            </div>
+                                        </div>
+                                        <div className="export-section">
+                                            <button className="export-btn" onClick={exportCollaudoPDF} disabled={sharedData.items.length === 0}>
+                                                📥 Esporta PDF Verbale Collaudo
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+
+                                {activeTab === 2 && (
+                                    <>
+                                        <h2 style={{ color: '#522398', marginBottom: '20px' }}>Verbale di Formazione</h2>
+                                        <ClienteForm sharedData={sharedData} updateSharedField={updateSharedField} />
+                                        <DettagliForm sharedData={sharedData} updateSharedField={updateSharedField} dataLabel="Data consegna" />
+                                        <ItemsTable items={sharedData.items} updateItem={updateItem} deleteItem={deleteItem} addItem={addItem} onCopyQty={copyQtyToOrdine} onMultiply={multiplyOrdine} />
+                                        <div className="export-section">
+                                            <button className="export-btn" onClick={exportFormazionePDF} disabled={sharedData.items.length === 0}>
+                                                📥 Esporta PDF Verbale Formazione
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {ddtData && (
+                        <div className="zip-section">
+                            <button className="zip-btn" onClick={exportAllZip} disabled={sharedData.items.length === 0}>
+                                📦 Esporta tutti i verbali (ZIP)
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
