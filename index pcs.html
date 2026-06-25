@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GE Healthcare - Generatore Moduli</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+        .app-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header { background: white; padding: 30px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 20px; }
+        .ge-logo { width: 80px; height: 80px; background: #522398; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 32px; }
+        .header-text h1 { color: #522398; font-size: 28px; margin-bottom: 5px; }
+        .header-text p { color: #666; font-size: 14px; }
+        .upload-section { background: white; padding: 30px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .upload-area { border: 2px dashed #522398; border-radius: 8px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.3s; }
+        .upload-area:hover, .upload-area.dragover { background: #f0e6f7; border-color: #6b2fb5; }
+        .upload-icon { font-size: 48px; color: #522398; margin-bottom: 15px; }
+        .upload-text { color: #333; font-size: 16px; margin-bottom: 10px; }
+        .upload-hint { color: #999; font-size: 14px; }
+        .file-input { display: none; }
+        .tabs-container { background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+        .tabs-header { display: flex; border-bottom: 2px solid #e0e0e0; }
+        .tab { flex: 1; padding: 20px; background: #f5f5f5; border: none; cursor: pointer; font-size: 16px; font-weight: 600; color: #666; transition: all 0.3s; }
+        .tab:hover { background: #ebebeb; }
+        .tab.active { background: white; color: #522398; border-bottom: 3px solid #522398; }
+        .tab-content { padding: 30px; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { color: #333; font-weight: 600; margin-bottom: 8px; font-size: 14px; }
+        .form-group input, .form-group textarea { padding: 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; font-family: inherit; transition: border-color 0.3s; }
+        .form-group input:focus, .form-group textarea:focus { outline: none; border-color: #522398; }
+        .form-group textarea { resize: vertical; min-height: 80px; }
+        .form-group.full-width { grid-column: 1 / -1; }
+        .form-group.required label::after { content: ' *'; color: #e53935; }
+        .form-group input.field-error, .form-group textarea.field-error { border-color: #e53935; background-color: #fff5f5; }
+        .field-error-msg { color: #e53935; font-size: 12px; margin-top: 4px; }
+        .items-section { margin-top: 30px; }
+        .items-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .items-header h3 { color: #522398; font-size: 20px; }
+        .add-item-btn { background: #522398; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600; transition: background 0.3s; }
+        .add-item-btn:hover { background: #6b2fb5; }
+        .items-table { width: 100%; background: white; border-radius: 4px; overflow: hidden; border: 1px solid #e0e0e0; }
+        .items-table table { width: 100%; border-collapse: collapse; }
+        .items-table th { background: #522398; color: white; padding: 12px; text-align: left; font-weight: 600; font-size: 13px; }
+        .items-table td { padding: 10px 12px; border-bottom: 1px solid #e0e0e0; }
+        .items-table tr:last-child td { border-bottom: none; }
+        .items-table input { width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 3px; font-size: 13px; }
+        .items-table input:focus { outline: none; border-color: #522398; }
+        .delete-btn { background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; transition: background 0.3s; }
+        .delete-btn:hover { background: #c82333; }
+        .export-section { margin-top: 30px; padding-top: 30px; border-top: 2px solid #e0e0e0; display: flex; justify-content: flex-end; }
+        .export-btn { background: #522398; color: white; border: none; padding: 15px 40px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: 600; transition: background 0.3s; box-shadow: 0 2px 4px rgba(82,35,152,0.3); }
+        .export-btn:hover { background: #6b2fb5; box-shadow: 0 4px 8px rgba(82,35,152,0.4); }
+        .export-btn:disabled { background: #ccc; cursor: not-allowed; box-shadow: none; }
+        .status-message { padding: 15px; border-radius: 4px; margin-bottom: 20px; font-size: 14px; }
+        .status-message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status-message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status-message.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .loading { text-align: center; padding: 20px; color: #522398; }
+        .empty-state { text-align: center; padding: 60px 20px; color: #999; }
+        .empty-state-icon { font-size: 64px; margin-bottom: 20px; opacity: 0.3; }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+    // Configura pdf.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+</script>
+<script type="text/babel">
+    const { useState, useRef } = React;
+
+    const App = () => {
+        const [activeTab, setActiveTab] = useState('collaudo');
+        const [pickData, setPickData] = useState(null);
+        const [ddtData, setDdtData] = useState(null);
+        const [statusMessage, setStatusMessage] = useState(null);
+        const [isLoading, setIsLoading] = useState(false);
+        const [warrantyError, setWarrantyError] = useState(false);
+
+        const [collaudoData, setCollaudoData] = useState({
+            billTo: '', shipTo: '', cigNr: '', systemMust: '',
+            poNr: '', gonNr: '', cupNr: '', ddtNumber: '', warrantyText: '', items: []
+        });
+
+        const [trainingData, setTrainingData] = useState({
+            billTo: '', shipTo: '', cigNr: '', systemMust: '',
+            poNr: '', gonNr: '', cupNr: '', ddtNumber: '', items: []
+        });
+
+        const fileInputRef = useRef(null);
+
+        // ─── DETECT DOC TYPE ─────────────────────────────────────────────
+        const detectDocumentType = (text) => {
+            if (text.includes('Documento di Trasporto') && text.includes('Intestatario Fattura')) return 'DDT';
+            if (text.includes('PACKING SLIP') && text.includes('Order Consolidate Information')) return 'PACKING_SLIP';
+            if (text.includes('PICK RELEASE')) return 'PICK';
+            return 'PICK';
+        };
+
+        // ─── PACKING SLIP + PICK PARSER ───────────────────────────────────
+        const extractDataFromText = (text) => {
+            const data = { orderNumber: '', shipTo: '', items: [] };
+            const docType = detectDocumentType(text);
+
+            if (docType === 'PACKING_SLIP') {
+                const shipToMatch = text.match(/Ship To:\s*([^\n]+(?:\n[^\n]+){0,5}?)(?=\s*Ship From:)/is);
+                if (shipToMatch) data.shipTo = shipToMatch[1].replace(/\s+/g, ' ').replace(/Ship To:/gi, '').trim();
+
+                const orderNumMatch = text.match(/Order\s*Number[:\s]+(\d+)/i);
+                if (orderNumMatch) data.orderNumber = orderNumMatch[1];
+
+                const poMatch = text.match(/Customer\s*PO\s*Number[:\s]+([A-Z0-9\s]+?)(?=\s+Barcode|\s+Sales)/i);
+                if (poMatch) data.poNumber = poMatch[1].trim();
+
+                const linePattern = /(\d+)\s+([\d.]+)\s+([A-Z]+\d+[A-Z0-9]+)\s+(.+?)\s+\d+\s+\d+\s+(\d+)\s+\d+/g;
+                let match;
+                while ((match = linePattern.exec(text)) !== null) {
+                    const itemNumber = match[3];
+                    let description = match[4].trim().replace(/Ì[^Î]*Î/g, '').replace(/^[A-Z]+\d+[A-Z0-9]+\s*/, '').replace(/\s+/g, ' ').replace(/EA\s*$/, '').trim();
+                    const shipQty = match[5];
+                    if (!description.startsWith('-') && description.length > 0)
+                        data.items.push({ itemNumber, description, qty: shipQty, serialNumber: '' });
+                }
+                data.itemCount = data.items.length;
+                return data;
+            }
+
+            // PICK
+            const orderMatch = text.match(/Order Number:\s*(\d+)/i);
+            if (orderMatch) data.orderNumber = orderMatch[1];
+
+            const shipToMatch = text.match(/SHIP TO:\s*(.+?)(?=\s+FOB:)/is);
+            if (shipToMatch) data.shipTo = shipToMatch[1].replace(/\s+/g, ' ').replace(/,\s*/g, ', ').trim();
+
+            const gridPattern = /([\d.]+)\s+([A-Z]+\d+[A-Z0-9]{4,})\s+(.+?)(?=[\d.]+\s+[A-Z]+\d+[A-Z0-9]{4,}|$)/gs;
+            let match;
+            const potentialItems = [];
+            while ((match = gridPattern.exec(text)) !== null) {
+                const itemNumber = match[2];
+                const restOfLine = match[3];
+                const lineMatch = restOfLine.match(/^(.+?)\s+(\d+)\s+EA\s+([A-Z0-9\-]*)/);
+                if (lineMatch) {
+                    let description = lineMatch[1].trim().replace(/\s+/g, ' ').replace(/\s*FG-3PL-US\s*$/, '').trim();
+                    const qty = lineMatch[2];
+                    let serialNumber = lineMatch[3] || '';
+                    if (serialNumber.startsWith('FG') || serialNumber.length < 6) serialNumber = '';
+                    potentialItems.push({ itemNumber, description, qty, serialNumber });
+                }
+            }
+            if (potentialItems.length > 0) {
+                data.items = potentialItems;
+            } else {
+                const simplePattern = /([A-Z]+\d+[A-Z0-9]+)\s+([A-Za-z0-9\s\-+().]+?)\s+(\d+)\s+EA\s*([A-Z0-9\-]*)/g;
+                while ((match = simplePattern.exec(text)) !== null) {
+                    let serialNumber = match[4] || '';
+                    if (serialNumber.startsWith('FG') || serialNumber.length < 6) serialNumber = '';
+                    data.items.push({ itemNumber: match[1], description: match[2].trim().replace(/\s+/g, ' '), qty: match[3], serialNumber });
+                }
+            }
+            data.itemCount = data.items.length;
+            return data;
+        };
+
+        // ─── DDT PARSER ───────────────────────────────────────────────────
+        const extractDDTData = (text) => {
+            const data = { billTo: '', shipTo: '', cigNr: '', cupNr: '', poNr: '', gonNr: '', ddtNumber: '', items: [] };
+
+            console.log('=== DDT PARSER START ===');
+            console.log('Testo (primi 1000 char):', text.substring(0, 1000));
+
+            // BILL TO
+            const intestatarioPos = text.indexOf('Intestatario Fattura');
+            if (intestatarioPos > 0) {
+                const afterIntestario = text.substring(intestatarioPos + 20);
+                const untilCodice = afterIntestario.split('Codice Fiscale')[0];
+                const allNumbers = [...untilCodice.matchAll(/\b(\d{7,8})\b/g)];
+                if (allNumbers.length > 0) {
+                    const lastNumber = allNumbers[allNumbers.length - 1];
+                    const codePos = lastNumber.index + lastNumber[1].length;
+                    const afterCode = untilCodice.substring(codePos);
+                    const billToMatch = afterCode.match(/\s*([A-Z][^]*?Italy)/i);
+                    if (billToMatch) data.billTo = billToMatch[1].replace(/\s+/g, ' ').trim();
+                }
+            }
+
+            // SHIP TO
+            const shipToMatch = text.match(/Destinazione\s+\d+\s+([^]+?)(?:Ordine Cliente|DDT Numero|SO Numero)/is);
+            if (shipToMatch) data.shipTo = shipToMatch[1].replace(/\s+/g, ' ').trim();
+
+            // PO, GON, DDT NUMBER
+            const poMatch = text.match(/Ordine Cliente\s+([A-Z0-9\-]+)/i);
+            if (poMatch) data.poNr = poMatch[1].trim();
+            const gonMatch = text.match(/SO Numero\s+(\d+)/i);
+            if (gonMatch) data.gonNr = gonMatch[1].trim();
+            const ddtMatch = text.match(/DDT Numero\s+(\d+)/i);
+            if (ddtMatch) data.ddtNumber = ddtMatch[1].trim();
+
+            // CIG e CUP
+            const referenteSection = text.match(/REFERENTE\s+CIG\s+CUP\s+RESA\s+CAUSALE DEL TRASPORTO\s+([^]+?)(?:RIGA|CODICE ARTICOLO)/is);
+            if (referenteSection) {
+                const valuesText = referenteSection[1];
+                const tokens = valuesText.split(/\s+/).filter(t => t.length >= 2);
+                const validTokens = tokens
+                    .map(t => t.replace(/[(),]/g, ''))
+                    .filter(t => {
+                        if (t === 'NA') return true;
+                        if (/[a-z]/.test(t)) return false;
+                        if (/^[A-Z0-9]{5,}$/.test(t)) return true;
+                        return false;
+                    });
+                if (validTokens.length >= 2) { data.cigNr = validTokens[0]; data.cupNr = validTokens[1]; }
+                else if (validTokens.length === 1) { data.cigNr = validTokens[0]; }
+            }
+
+            // ─── ITEMS ────────────────────────────────────────────────────
+            // La tabella DDT ha colonne: RIGA | CODICE ARTICOLO | DESCRIZIONE | U.M. | QUANTITA | MATRICOLA | LOTTO
+            // Codici articolo GE possono contenere trattini: es. 8855002-001-01405721, 5696975-002, 2111053-010
+            // e anche essere alfanumerici: es. H48711YS
+            const itemsSectionMatch = text.match(/(?:MATRICOLA|LOTTO)\s+([\s\S]+?)(?:COMMENTI|NUMERO COLLI|Referente|$)/i);
+
+            if (itemsSectionMatch) {
+                const itemsText = itemsSectionMatch[1];
+                console.log('Sezione items DDT (primi 800 char):', itemsText.substring(0, 800));
+
+                // Splitta per ogni inizio riga item:
+                // Numero riga tipo "1.1.0 " o "5.1 " seguito da codice (cifre/lettere/trattini, min 5 char)
+                const rowSplitPattern = /(?=\d+\.\d+[\.\d]*\s+[\dA-Z][\dA-Z\-]{4,}\s)/g;
+                const rawSegments = itemsText.split(rowSplitPattern);
+
+                console.log('Segmenti DDT trovati:', rawSegments.length);
+
+                const badSerial = ['COMMENTI', 'NUMERO', 'PESO', 'ASPETTO', 'LOTTO', 'VETTORE', 'DATA'];
+
+                for (let segment of rawSegments) {
+                    segment = segment.trim();
+                    if (!segment || segment.length < 8) continue;
+
+                    // Pattern principale: RIGA + CODICE(con trattini) + DESCRIZIONE + UM + QTY + [MATRICOLA]
+                    const itemMatch = segment.match(
+                        /^(\d+\.\d+[\.\d]*)\s+([\dA-Z][\dA-Z\-]{4,})\s+(.+?)\s+(EA|PC|NR|KG|SET)\s+(\d+)\s*([A-Z0-9\-]{6,})?/i
+                    );
+
+                    if (itemMatch) {
+                        let description = itemMatch[3].trim().replace(/\s+/g, ' ');
+                        const qty       = itemMatch[5];
+                        let serialNumber = itemMatch[6] || '';
+                        const itemNumber = itemMatch[2].trim();
+
+                        description = description.replace(/^\d+\.[\d.]*\s+/, '').trim();
+
+                        if (serialNumber && (
+                            badSerial.some(b => serialNumber.toUpperCase().includes(b)) ||
+                            serialNumber.length < 6 || serialNumber.startsWith('FG')
+                        )) serialNumber = '';
+
+                        console.log('DDT item OK:', { itemNumber, description, qty, serialNumber });
+                        data.items.push({ itemNumber, description, qty, serialNumber });
+
+                    } else {
+                        // Fallback senza U.M. esplicita
+                        const fbMatch = segment.match(
+                            /^(\d+\.\d+[\.\d]*)\s+([\dA-Z][\dA-Z\-]{4,})\s+(.+?)\s+(\d+)\s*([A-Z0-9\-]{6,})?$/i
+                        );
+                        if (fbMatch) {
+                            let description  = fbMatch[3].trim().replace(/\s+/g, ' ');
+                            const qty        = fbMatch[4];
+                            let serialNumber = fbMatch[5] || '';
+                            const itemNumber = fbMatch[2].trim();
+
+                            description = description.replace(/^\d+\.[\d.]*\s+/, '').trim();
+                            if (serialNumber && (
+                                badSerial.some(b => serialNumber.toUpperCase().includes(b)) ||
+                                serialNumber.length < 6 || serialNumber.startsWith('FG')
+                            )) serialNumber = '';
+
+                            console.log('DDT item (fallback):', { itemNumber, description, qty, serialNumber });
+                            data.items.push({ itemNumber, description, qty, serialNumber });
+                        } else {
+                            if (segment.length > 10) console.log('Segmento non matchato:', segment.substring(0, 80));
+                        }
+                    }
+                }
+
+                console.log('Totale items DDT estratti:', data.items.length);
+            } else {
+                console.log('Sezione items DDT NON trovata');
+            }
+
+            // Rimuovi eventuale falso "COMMENTI"
+            if (data.items.length > 0 && data.items[data.items.length - 1].itemNumber === 'COMMENTI') data.items.pop();
+
+            data.itemCount = data.items.length;
+            console.log('DDT finale:', { billTo: data.billTo, shipTo: data.shipTo, cig: data.cigNr, cup: data.cupNr, gon: data.gonNr, items: data.itemCount });
+            return data;
+        };
+
+        // ─── PDF PARSE ────────────────────────────────────────────────────
+        const parsePDF = async (file) => {
+            setIsLoading(true);
+            setStatusMessage({ type: 'info', text: 'Analisi del documento in corso...' });
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+                let fullText = '';
+                const pageTexts = [];
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    pageTexts.push(pageText);
+                    fullText += pageText + '\n';
+                }
+
+                const docType = detectDocumentType(fullText);
+                let extractedData, docName;
+
+                if (docType === 'DDT') {
+                    if (pdf.numPages > 1) {
+                        const allPageData = pageTexts.map(pt => extractDDTData(pt));
+                        extractedData = { ...allPageData[0] };
+                        for (let i = 1; i < allPageData.length; i++) {
+                            const pd = allPageData[i];
+                            if (!extractedData.billTo && pd.billTo) extractedData.billTo = pd.billTo;
+                            if (!extractedData.shipTo && pd.shipTo) extractedData.shipTo = pd.shipTo;
+                            if (!extractedData.poNr && pd.poNr) extractedData.poNr = pd.poNr;
+                            if (!extractedData.gonNr && pd.gonNr) extractedData.gonNr = pd.gonNr;
+                            if (!extractedData.ddtNumber && pd.ddtNumber) extractedData.ddtNumber = pd.ddtNumber;
+                            if ((!extractedData.cigNr || extractedData.cigNr === 'NA') && pd.cigNr && pd.cigNr !== 'NA') extractedData.cigNr = pd.cigNr;
+                            if ((!extractedData.cupNr || extractedData.cupNr === 'NA') && pd.cupNr && pd.cupNr !== 'NA') extractedData.cupNr = pd.cupNr;
+                        }
+                        extractedData.items = [];
+                        for (const pd of allPageData) extractedData.items.push(...pd.items);
+                        extractedData.itemCount = extractedData.items.length;
+                        const ddtNumbers = allPageData.map(pd => pd.ddtNumber).filter(n => n && n.trim());
+                        if (ddtNumbers.length > 0) extractedData.ddtNumber = ddtNumbers.join(', ');
+                    } else {
+                        extractedData = extractDDTData(fullText);
+                    }
+                    docName = 'DDT';
+                    setDdtData(extractedData);
+                    setPickData(null);
+                    setCollaudoData(prev => ({ ...prev, billTo: extractedData.billTo, shipTo: extractedData.shipTo, cigNr: extractedData.cigNr, cupNr: extractedData.cupNr, poNr: extractedData.poNr, gonNr: extractedData.gonNr, ddtNumber: extractedData.ddtNumber, items: extractedData.items }));
+                    setTrainingData(prev => ({ ...prev, billTo: extractedData.billTo, shipTo: extractedData.shipTo, cigNr: extractedData.cigNr, cupNr: extractedData.cupNr, poNr: extractedData.poNr, gonNr: extractedData.gonNr, ddtNumber: extractedData.ddtNumber, items: extractedData.items }));
+                } else {
+                    extractedData = extractDataFromText(fullText);
+                    docName = docType === 'PACKING_SLIP' ? 'Packing Slip' : 'Pick';
+                    setPickData(extractedData);
+                    setDdtData(null);
+                    setCollaudoData(prev => ({ ...prev, billTo: extractedData.shipTo, shipTo: extractedData.shipTo, poNr: extractedData.poNumber || '', gonNr: extractedData.orderNumber, items: extractedData.items }));
+                    setTrainingData(prev => ({ ...prev, billTo: extractedData.shipTo, shipTo: extractedData.shipTo, poNr: extractedData.poNumber || '', gonNr: extractedData.orderNumber, items: extractedData.items }));
+                }
+
+                setStatusMessage({ type: 'success', text: `✓ ${docName} caricato! Trovati ${extractedData.items.length} articoli.` });
+            } catch (error) {
+                console.error('Errore parsing PDF:', error);
+                setStatusMessage({ type: 'error', text: 'Errore durante l\'analisi del documento.' });
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        const handleFileUpload = (e) => {
+            const file = e.target.files[0];
+            if (file && file.type === 'application/pdf') parsePDF(file);
+            else setStatusMessage({ type: 'error', text: 'Per favore carica un file PDF valido.' });
+        };
+
+        const handleDragOver = (e) => { e.preventDefault(); e.currentTarget.classList.add('dragover'); };
+        const handleDragLeave = (e) => { e.preventDefault(); e.currentTarget.classList.remove('dragover'); };
+        const handleDrop = (e) => {
+            e.preventDefault();
+            e.currentTarget.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type === 'application/pdf') parsePDF(file);
+        };
+
+        const updateCollaudoField = (field, value) => {
+            setCollaudoData(prev => ({ ...prev, [field]: value }));
+            setTrainingData(prev => ({ ...prev, [field]: value }));
+        };
+        const updateTrainingField = (field, value) => setTrainingData(prev => ({ ...prev, [field]: value }));
+
+        const updateCollaudoItem = (index, field, value) => {
+            setCollaudoData(prev => { const ni = [...prev.items]; ni[index] = { ...ni[index], [field]: value }; return { ...prev, items: ni }; });
+            setTrainingData(prev => { const ni = [...prev.items]; ni[index] = { ...ni[index], [field]: value }; return { ...prev, items: ni }; });
+        };
+        const updateTrainingItem = (index, field, value) => setTrainingData(prev => { const ni = [...prev.items]; ni[index] = { ...ni[index], [field]: value }; return { ...prev, items: ni }; });
+
+        const addCollaudoItem = () => {
+            const ni = { itemNumber: '', description: '', qty: '', serialNumber: '' };
+            setCollaudoData(prev => ({ ...prev, items: [...prev.items, ni] }));
+            setTrainingData(prev => ({ ...prev, items: [...prev.items, ni] }));
+        };
+        const addTrainingItem = () => setTrainingData(prev => ({ ...prev, items: [...prev.items, { itemNumber: '', description: '', qty: '', serialNumber: '' }] }));
+
+        const deleteCollaudoItem = (index) => {
+            setCollaudoData(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
+            setTrainingData(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
+        };
+        const deleteTrainingItem = (index) => setTrainingData(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
+
+        // ─── EXPORT COLLAUDO PDF ──────────────────────────────────────────
+        const exportCollaudoPDF = () => {
+            if (!collaudoData.warrantyText || !collaudoData.warrantyText.trim()) { setWarrantyError(true); return; }
+            setWarrantyError(false);
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            doc.setFontSize(11); doc.setTextColor(82,35,152); doc.setFont(undefined,'bold');
+            doc.text('GE HealthCare', 15, 15);
+            doc.setFontSize(18); doc.setFont(undefined,'bold'); doc.setTextColor(0,0,0);
+            doc.text('VERBALE DI COLLAUDO E ACCETTAZIONE DEL SISTEMA', 105, 35, { align: 'center' });
+            doc.setFontSize(11); doc.setFont(undefined,'normal');
+            doc.text('(ACCEPTANCE DOCUMENT)', 105, 42, { align: 'center' });
+
+            let y = 52;
+            doc.setFontSize(9); doc.setFont(undefined,'bold');
+            doc.text('Intestatario (bill to)', 15, y);
+            doc.text('destinazione (ship to)', 110, y);
+            doc.setDrawColor(0); doc.setLineWidth(0.3);
+            doc.rect(15, y+2, 85, 20); doc.rect(110, y+2, 85, 20);
+            doc.setFont(undefined,'normal'); doc.setFontSize(8);
+            doc.text(doc.splitTextToSize(collaudoData.billTo||'', 80), 17, y+6);
+            doc.text(doc.splitTextToSize(collaudoData.shipTo||'', 80), 112, y+6);
+
+            y = 78;
+            doc.setFontSize(8); doc.setFont(undefined,'bold');
+            doc.text('CIG nr', 15, y); doc.text('System in Must nr', 55, y);
+            doc.text('Ordine Cliente nr (PO nr)', 110, y); doc.text('GON nr', 165, y);
+            doc.setFont(undefined,'normal');
+            doc.rect(15,y+2,35,6); doc.rect(55,y+2,50,6); doc.rect(110,y+2,50,6); doc.rect(165,y+2,30,6);
+            doc.text(collaudoData.cigNr||'', 17, y+6); doc.text(collaudoData.systemMust||'', 57, y+6);
+            doc.text(collaudoData.poNr||'', 112, y+6); doc.text(collaudoData.gonNr||'', 167, y+6);
+
+            y += 12; doc.setFont(undefined,'bold'); doc.text('CUP nr', 15, y);
+            doc.setFont(undefined,'normal'); doc.rect(15,y+2,180,6); doc.text(collaudoData.cupNr||'', 17, y+6);
+
+            y += 14; doc.setFont(undefined,'bold');
+            doc.text('Alla presenza dei Signori', 15, y); doc.text('per', 110, y); doc.text('GE MEDICAL SYSTEMS ITALIA SPA', 120, y);
+            doc.setFontSize(7); doc.setFont(undefined,'italic'); doc.text('(people attending acceptance)', 15, y+4);
+            doc.setFont(undefined,'normal'); doc.setFontSize(8);
+            for (let i=0;i<3;i++) doc.text('per', 110, y+8+(i*4));
+            doc.text('per', 110, y+20); doc.setFont(undefined,'bold'); doc.text('CLIENTE CUSTOMER', 120, y+20);
+            doc.setFont(undefined,'normal'); doc.text('per', 110, y+24); doc.text('per', 110, y+28);
+
+            y += 36; doc.setFontSize(9); doc.setFont(undefined,'bold');
+            doc.text('Si è proceduto al Collaudo', 15, y); doc.text('Serial Number', 165, y);
+            doc.setFontSize(8); doc.setFont(undefined,'normal'); doc.text('delle seguenti apparecchiature', 15, y+4);
+            doc.setFontSize(7); doc.setFont(undefined,'italic'); doc.text('(LIST OF ITEMS)', 15, y+8);
+
+            doc.autoTable({
+                startY: y+12,
+                head: [['Item Number','Description','Qty','Serial Number']],
+                body: collaudoData.items.map(item => [item.itemNumber, item.description, item.qty, item.serialNumber]),
+                theme: 'grid',
+                headStyles: { fillColor:[255,255,255], textColor:[0,0,0], fontStyle:'bold', lineWidth:0.3, lineColor:[0,0,0] },
+                styles: { fontSize:7, cellPadding:2, lineWidth:0.3, lineColor:[0,0,0] },
+                columnStyles: { 0:{cellWidth:30}, 1:{cellWidth:90}, 2:{cellWidth:15}, 3:{cellWidth:40} }
+            });
+
+            let finalY = doc.lastAutoTable.finalY + 8;
+            if (finalY > 180) { doc.addPage(); finalY = 20; }
+
+            doc.setFontSize(7); doc.setFont(undefined,'normal');
+            doc.text('Il Cliente provvederà a verificare l\'efficienza dell\'impianto di terra a monte del Sistema ed a mantenerla nel tempo.', 15, finalY);
+            finalY += 4; doc.setFont(undefined,'bold');
+            doc.text('IL MATERIALE E\' RISULTATO RISPONDENTE ALLE CONDIZIONI CONTRATTUALI.', 15, finalY);
+            finalY += 4;
+            doc.text('LA SOTTOSCRIZIONE DEL PRESENTE VERBALE COSTITUISCE TITOLO VALIDO AL FINE DELLA DECORRENZA DEGLI ADEMPIMENTI', 15, finalY);
+            finalY += 3; doc.text('CONTRATTUALI LEGATI AL COLLAUDO.', 15, finalY);
+
+            finalY += 8; doc.setFont(undefined,'bold'); doc.text('ALLEGATI:', 15, finalY);
+            doc.rect(35,finalY-3,3,3); doc.text('X', 36, finalY-0.5);
+            doc.setFont(undefined,'normal'); doc.text('DICHIARAZIONE DI CONFORMITA\'', 40, finalY);
+            doc.rect(110,finalY-3,3,3); doc.text('SCHEDA MISURE', 115, finalY);
+            finalY += 5; doc.rect(35,finalY-3,3,3); doc.text('ALTRE:', 40, finalY);
+
+            finalY += 8; doc.setFont(undefined,'bold'); doc.text('Data verbale:', 15, finalY);
+            doc.setFontSize(6); doc.setFont(undefined,'italic'); doc.text('(ACCEPTANCE DATE)', 15, finalY+3);
+            doc.setFontSize(7); doc.setFont(undefined,'normal');
+            doc.rect(15,finalY+5,80,20);
+            doc.text('Per la Casa fornitrice', 15, finalY+8);
+            doc.setFontSize(6); doc.setFont(undefined,'italic'); doc.text('(SUPPLIER)', 15, finalY+11);
+            doc.setFontSize(7); doc.setFont(undefined,'normal');
+            doc.rect(110,finalY+5,85,20); doc.text('Timbro e firma del Cliente', 110, finalY+8);
+            doc.setFontSize(6); doc.setFont(undefined,'italic'); doc.text('(CUSTOMER)', 110, finalY+11);
+
+            finalY += 28;
+            let warrantyBoxH = 14+4+4+4;
+            if (collaudoData.warrantyText && collaudoData.warrantyText.trim()) {
+                const wlines = doc.splitTextToSize(collaudoData.warrantyText, 175);
+                warrantyBoxH += 8 + (wlines.length*4) + 4;
+            }
+            doc.setFontSize(9); doc.setFont(undefined,'bold');
+            doc.rect(15,finalY,180,warrantyBoxH);
+            doc.text('Durata della Garanzia:', 17, finalY+4);
+            doc.setFontSize(7); doc.setFont(undefined,'italic'); doc.text('(WARRANTY PERIOD)', 17, finalY+8);
+            finalY += 14; doc.setFontSize(7); doc.setFont(undefined,'normal');
+            finalY += 4;
+            doc.text('Per le parti meccaniche ed elettriche, come da contratto di vendita, la garanzia', 15, finalY);
+            finalY += 4; doc.text('decorre dalla data del presente documento.', 15, finalY);
+            if (collaudoData.warrantyText && collaudoData.warrantyText.trim()) {
+                finalY += 8;
+                const wlines = doc.splitTextToSize(collaudoData.warrantyText, 175);
+                doc.text(wlines, 15, finalY);
+                finalY += wlines.length*4;
+            }
+
+            finalY += 10; doc.setFontSize(6); doc.setFont(undefined,'bold');
+            doc.text('GE Medical Systems Italia S.p.A.', 15, finalY); finalY += 3;
+            doc.setFont(undefined,'normal');
+            doc.text('Società con socio unico, Capitale € 5.000.000 i.v. - Sede Legale: Via Galeno 36, 20126 Milano', 15, finalY); finalY += 3;
+            doc.text('CF e Registro Imprese Milano 93027710016 REA 1689710 P.IVA 03663500969', 15, finalY); finalY += 3;
+            doc.text('Società soggetta a controllo e coordinamento di General Electric Company', 15, finalY); finalY += 3;
+            doc.text('TEL +39 02 26001111 - FAX +39 02 26001413', 15, finalY);
+
+            const totalPages = doc.internal.getNumberOfPages();
+            for (let p=1; p<=totalPages; p++) {
+                doc.setPage(p);
+                doc.setFontSize(7); doc.setFont(undefined,'normal'); doc.setTextColor(100,100,100);
+                doc.text(`Modulo Collaudo - GON ${collaudoData.gonNr||''}`, 15, 290);
+                doc.text(`${p} di ${totalPages}`, 195, 290, { align:'right' });
+            }
+            doc.save(`Collaudo_${collaudoData.gonNr||'documento'}.pdf`);
+            setStatusMessage({ type:'success', text:'PDF Collaudo esportato con successo!' });
+        };
+
+        // ─── EXPORT TRAINING PDF ──────────────────────────────────────────
+        const exportTrainingPDF = () => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            doc.setFontSize(11); doc.setTextColor(82,35,152); doc.setFont(undefined,'bold');
+            doc.text('GE HealthCare', 15, 15);
+            doc.setFontSize(16); doc.setFont(undefined,'bold'); doc.setTextColor(0,0,0);
+            doc.text('ATTESTAZIONE DELL\'AVVENUTO TRAINING', 105, 32, { align:'center' });
+            doc.text('DEL PERSONALE SANITARIO', 105, 40, { align:'center' });
+            doc.setFontSize(11); doc.setFont(undefined,'normal');
+            doc.text('(ACCEPTANCE DOCUMENT)', 105, 47, { align:'center' });
+
+            let y = 55;
+            doc.setFontSize(9); doc.setFont(undefined,'bold');
+            doc.text('Intestatario (bill to)', 15, y); doc.text('destinazione (ship to)', 110, y);
+            doc.setDrawColor(0); doc.setLineWidth(0.3);
+            doc.rect(15,y+2,85,20); doc.rect(110,y+2,85,20);
+            doc.setFont(undefined,'normal'); doc.setFontSize(8);
+            doc.text(doc.splitTextToSize(trainingData.billTo||'', 80), 17, y+6);
+            doc.text(doc.splitTextToSize(trainingData.shipTo||'', 80), 112, y+6);
+
+            y += 26; doc.setFontSize(8); doc.setFont(undefined,'bold');
+            doc.text('CIG nr', 15, y); doc.text('System in Must nr', 55, y);
+            doc.text('Ordine Cliente nr (PO nr)', 110, y); doc.text('GON nr', 165, y);
+            doc.setFont(undefined,'normal');
+            doc.rect(15,y+2,35,6); doc.rect(55,y+2,50,6); doc.rect(110,y+2,50,6); doc.rect(165,y+2,30,6);
+            doc.text(trainingData.cigNr||'', 17, y+6); doc.text(trainingData.systemMust||'', 57, y+6);
+            doc.text(trainingData.poNr||'', 112, y+6); doc.text(trainingData.gonNr||'', 167, y+6);
+
+            y += 12; doc.setFont(undefined,'bold'); doc.text('CUP nr', 15, y);
+            doc.setFont(undefined,'normal'); doc.rect(15,y+2,180,6); doc.text(trainingData.cupNr||'', 17, y+6);
+
+            y += 14; doc.setFont(undefined,'bold');
+            doc.text('Alla presenza dei Signori', 15, y); doc.text('per', 110, y); doc.text('GE MEDICAL SYSTEMS ITALIA SPA', 120, y);
+            doc.setFontSize(7); doc.setFont(undefined,'italic'); doc.text('(people attending acceptance)', 15, y+4);
+            doc.setFont(undefined,'normal'); doc.setFontSize(8);
+            for (let i=0;i<3;i++) doc.text('per', 110, y+8+(i*4));
+            doc.text('per', 110, y+20); doc.setFont(undefined,'bold'); doc.text('CLIENTE CUSTOMER', 120, y+20);
+            doc.setFont(undefined,'normal'); doc.text('per', 110, y+24); doc.text('per', 110, y+28);
+
+            y += 36; doc.setFontSize(9); doc.setFont(undefined,'bold');
+            doc.text('Si è proceduto al training', 15, y); doc.text('Serial Number', 165, y);
+            doc.setFontSize(8); doc.setFont(undefined,'normal'); doc.text('per le seguenti apparecchiature', 15, y+4);
+            doc.setFontSize(7); doc.setFont(undefined,'italic'); doc.text('(LIST OF ITEMS)', 15, y+8);
+
+            doc.autoTable({
+                startY: y+12,
+                head: [['Item Number','Description','Qty','Serial Number']],
+                body: trainingData.items.map(item => [item.itemNumber, item.description, item.qty, item.serialNumber]),
+                theme: 'grid',
+                headStyles: { fillColor:[255,255,255], textColor:[0,0,0], fontStyle:'bold', lineWidth:0.3, lineColor:[0,0,0] },
+                styles: { fontSize:7, cellPadding:2, lineWidth:0.3, lineColor:[0,0,0] },
+                columnStyles: { 0:{cellWidth:30}, 1:{cellWidth:90}, 2:{cellWidth:15}, 3:{cellWidth:40} }
+            });
+
+            let finalY = doc.lastAutoTable.finalY + 8;
+            if (finalY > 185) { doc.addPage(); finalY = 20; }
+
+            doc.setFontSize(7); doc.setFont(undefined,'normal');
+            doc.text('Il Cliente provvederà a verificare l\'efficienza dell\'impianto di terra a monte del Sistema ed a mantenerla nel tempo.', 15, finalY);
+            finalY += 4; doc.setFont(undefined,'bold');
+            doc.text('IL MATERIALE E\' RISULTATO RISPONDENTE ALLE CONDIZIONI CONTRATTUALI.', 15, finalY);
+            finalY += 4;
+            doc.text('LA SOTTOSCRIZIONE DEL PRESENTE VERBALE COSTITUISCE TITOLO VALIDO AL FINE DELLA DECORRENZA DEGLI ADEMPIMENTI', 15, finalY);
+            finalY += 3; doc.text('CONTRATTUALI LEGATI AL COLLAUDO.', 15, finalY);
+
+            finalY += 8; doc.setFont(undefined,'bold'); doc.text('ALLEGATI:', 15, finalY);
+            doc.rect(35,finalY-3,3,3); doc.text('X', 36, finalY-0.5);
+            doc.setFont(undefined,'normal'); doc.text('DICHIARAZIONE DI CONFORMITA\'', 40, finalY);
+            doc.rect(110,finalY-3,3,3); doc.text('SCHEDA MISURE', 115, finalY);
+            finalY += 5; doc.rect(35,finalY-3,3,3); doc.text('ALTRE:', 40, finalY);
+
+            finalY += 8; doc.setFont(undefined,'bold'); doc.text('Data verbale:', 15, finalY);
+            doc.setFontSize(6); doc.setFont(undefined,'italic'); doc.text('(ACCEPTANCE DATE)', 15, finalY+3);
+            doc.setFontSize(7); doc.setFont(undefined,'normal');
+            doc.rect(15,finalY+5,80,20);
+            doc.text('Per la Casa fornitrice', 15, finalY+8);
+            doc.setFontSize(6); doc.setFont(undefined,'italic'); doc.text('(SUPPLIER)', 15, finalY+11);
+            doc.setFontSize(7); doc.setFont(undefined,'normal');
+            doc.rect(110,finalY+5,85,20); doc.text('Timbro e firma del Cliente', 110, finalY+8);
+            doc.setFontSize(6); doc.setFont(undefined,'italic'); doc.text('(CUSTOMER)', 110, finalY+11);
+
+            finalY += 28; doc.setFontSize(6); doc.setFont(undefined,'bold');
+            doc.text('GE Medical Systems Italia S.p.A.', 15, finalY); finalY += 3;
+            doc.setFont(undefined,'normal');
+            doc.text('Società con socio unico, Capitale € 5.000.000 i.v. - Sede Legale: Via Galeno 36, 20126 Milano', 15, finalY); finalY += 3;
+            doc.text('CF e Registro Imprese Milano 93027710016 REA 1689710 P.IVA 03663500969', 15, finalY); finalY += 3;
+            doc.text('Società soggetta a controllo e coordinamento di General Electric Company', 15, finalY); finalY += 3;
+            doc.text('TEL +39 02 26001111 - FAX +39 02 26001413', 15, finalY);
+
+            const totalPagesT = doc.internal.getNumberOfPages();
+            for (let p=1; p<=totalPagesT; p++) {
+                doc.setPage(p);
+                doc.setFontSize(7); doc.setFont(undefined,'normal'); doc.setTextColor(100,100,100);
+                doc.text(`Modulo Training - GON ${trainingData.gonNr||''}`, 15, 290);
+                doc.text(`${p} di ${totalPagesT}`, 195, 290, { align:'right' });
+            }
+            doc.save(`Training_${trainingData.gonNr||'documento'}.pdf`);
+            setStatusMessage({ type:'success', text:'PDF Training esportato con successo!' });
+        };
+
+        // ─── RENDER ───────────────────────────────────────────────────────
+        return (
+            <div className="app-container">
+                <div className="header">
+                    <div className="ge-logo">GE</div>
+                    <div className="header-text">
+                        <h1>GE Healthcare - Generatore Moduli</h1>
+                        <p>Carica un documento DDT, Pick Release o Packing Slip per generare automaticamente i moduli di Collaudo e Training</p>
+                    </div>
+                </div>
+
+                <div className="upload-section">
+                    <h2 style={{color:'#522398', marginBottom:'20px'}}>1. Carica Documento</h2>
+                    {statusMessage && (
+                        <div className={`status-message ${statusMessage.type}`}>{statusMessage.text}</div>
+                    )}
+                    <div
+                        className="upload-area"
+                        onClick={() => fileInputRef.current.click()}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                    >
+                        <div className="upload-icon">📄</div>
+                        <div className="upload-text">Clicca o trascina qui il tuo documento PDF</div>
+                        <div className="upload-hint">Supporta DDT, Pick Release e Packing Slip</div>
+                        <input type="file" className="file-input" ref={fileInputRef} accept=".pdf" onChange={handleFileUpload} />
+                    </div>
+                </div>
+
+                {isLoading && <div className="loading"><p>⏳ Analisi del documento in corso...</p></div>}
+
+                {(pickData || ddtData) && (
+                    <div className="tabs-container">
+                        <div className="tabs-header">
+                            <button className={`tab ${activeTab==='collaudo'?'active':''}`} onClick={() => setActiveTab('collaudo')}>📋 Modulo Collaudo</button>
+                            <button className={`tab ${activeTab==='training'?'active':''}`} onClick={() => setActiveTab('training')}>🎓 Modulo Training</button>
+                        </div>
+                        <div className="tab-content">
+                            {activeTab === 'collaudo' ? (
+                                <>
+                                    <h2 style={{color:'#522398', marginBottom:'20px'}}>2. Compila Modulo Collaudo</h2>
+                                    <div className="form-grid">
+                                        <div className="form-group">
+                                            <label>Intestatario (Bill To)</label>
+                                            <textarea value={collaudoData.billTo} onChange={e => updateCollaudoField('billTo', e.target.value)} placeholder="Inserisci intestatario" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Destinazione (Ship To)</label>
+                                            <textarea value={collaudoData.shipTo} onChange={e => updateCollaudoField('shipTo', e.target.value)} placeholder="Inserisci destinazione" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>GON nr</label>
+                                            <input type="text" value={collaudoData.gonNr} onChange={e => updateCollaudoField('gonNr', e.target.value)} placeholder="Inserisci GON" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Ordine Cliente (PO nr)</label>
+                                            <input type="text" value={collaudoData.poNr} onChange={e => updateCollaudoField('poNr', e.target.value)} placeholder="Inserisci PO" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>CIG nr</label>
+                                            <input type="text" value={collaudoData.cigNr} onChange={e => updateCollaudoField('cigNr', e.target.value)} placeholder="Inserisci CIG" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>CUP nr</label>
+                                            <input type="text" value={collaudoData.cupNr} onChange={e => updateCollaudoField('cupNr', e.target.value)} placeholder="Inserisci CUP" />
+                                        </div>
+                                        <div className="form-group full-width required">
+                                            <label>Garanzia</label>
+                                            <input
+                                                type="text"
+                                                className={warrantyError ? 'field-error' : ''}
+                                                value={collaudoData.warrantyText}
+                                                onChange={e => { updateCollaudoField('warrantyText', e.target.value); if (e.target.value.trim()) setWarrantyError(false); }}
+                                                placeholder="Es: Per le parti meccaniche ed elettriche, 12 mesi a scalare dalla data del collaudo"
+                                            />
+                                            {warrantyError && <span className="field-error-msg">Campo obbligatorio per l'export del PDF Collaudo</span>}
+                                        </div>
+                                    </div>
+                                    <div className="items-section">
+                                        <div className="items-header">
+                                            <h3>Articoli</h3>
+                                            <button className="add-item-btn" onClick={addCollaudoItem}>+ Aggiungi Articolo</button>
+                                        </div>
+                                        {collaudoData.items.length > 0 ? (
+                                            <div className="items-table">
+                                                <table>
+                                                    <thead><tr><th>Item Number</th><th>Description</th><th>Qty</th><th>Serial Number</th><th>Azioni</th></tr></thead>
+                                                    <tbody>
+                                                        {collaudoData.items.map((item, idx) => (
+                                                            <tr key={idx}>
+                                                                <td><input type="text" value={item.itemNumber} onChange={e => updateCollaudoItem(idx,'itemNumber',e.target.value)} /></td>
+                                                                <td><input type="text" value={item.description} onChange={e => updateCollaudoItem(idx,'description',e.target.value)} /></td>
+                                                                <td><input type="text" value={item.qty} onChange={e => updateCollaudoItem(idx,'qty',e.target.value)} /></td>
+                                                                <td><input type="text" value={item.serialNumber} onChange={e => updateCollaudoItem(idx,'serialNumber',e.target.value)} /></td>
+                                                                <td><button className="delete-btn" onClick={() => deleteCollaudoItem(idx)}>Elimina</button></td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : (
+                                            <div className="empty-state"><div className="empty-state-icon">📦</div><p>Nessun articolo presente</p></div>
+                                        )}
+                                    </div>
+                                    <div className="export-section">
+                                        {warrantyError && <div className="field-error-msg" style={{textAlign:'center', marginBottom:'10px', fontSize:'13px'}}>Compila il campo Garanzia prima di esportare il PDF Collaudo.</div>}
+                                        <button className="export-btn" onClick={exportCollaudoPDF} disabled={collaudoData.items.length === 0}>📥 Esporta PDF Collaudo</button>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <h2 style={{color:'#522398', marginBottom:'20px'}}>2. Compila Modulo Training</h2>
+                                    <div className="form-grid">
+                                        <div className="form-group">
+                                            <label>Intestatario (Bill To)</label>
+                                            <textarea value={trainingData.billTo} onChange={e => updateTrainingField('billTo', e.target.value)} placeholder="Inserisci intestatario" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Destinazione (Ship To)</label>
+                                            <textarea value={trainingData.shipTo} onChange={e => updateTrainingField('shipTo', e.target.value)} placeholder="Inserisci destinazione" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>GON nr</label>
+                                            <input type="text" value={trainingData.gonNr} onChange={e => updateTrainingField('gonNr', e.target.value)} placeholder="Inserisci GON" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Ordine Cliente (PO nr)</label>
+                                            <input type="text" value={trainingData.poNr} onChange={e => updateTrainingField('poNr', e.target.value)} placeholder="Inserisci PO" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>CIG nr</label>
+                                            <input type="text" value={trainingData.cigNr} onChange={e => updateTrainingField('cigNr', e.target.value)} placeholder="Inserisci CIG" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>CUP nr</label>
+                                            <input type="text" value={trainingData.cupNr} onChange={e => updateTrainingField('cupNr', e.target.value)} placeholder="Inserisci CUP" />
+                                        </div>
+                                    </div>
+                                    <div className="items-section">
+                                        <div className="items-header">
+                                            <h3>Articoli</h3>
+                                            <button className="add-item-btn" onClick={addTrainingItem}>+ Aggiungi Articolo</button>
+                                        </div>
+                                        {trainingData.items.length > 0 ? (
+                                            <div className="items-table">
+                                                <table>
+                                                    <thead><tr><th>Item Number</th><th>Description</th><th>Qty</th><th>Serial Number</th><th>Azioni</th></tr></thead>
+                                                    <tbody>
+                                                        {trainingData.items.map((item, idx) => (
+                                                            <tr key={idx}>
+                                                                <td><input type="text" value={item.itemNumber} onChange={e => updateTrainingItem(idx,'itemNumber',e.target.value)} /></td>
+                                                                <td><input type="text" value={item.description} onChange={e => updateTrainingItem(idx,'description',e.target.value)} /></td>
+                                                                <td><input type="text" value={item.qty} onChange={e => updateTrainingItem(idx,'qty',e.target.value)} /></td>
+                                                                <td><input type="text" value={item.serialNumber} onChange={e => updateTrainingItem(idx,'serialNumber',e.target.value)} /></td>
+                                                                <td><button className="delete-btn" onClick={() => deleteTrainingItem(idx)}>Elimina</button></td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : (
+                                            <div className="empty-state"><div className="empty-state-icon">📦</div><p>Nessun articolo presente</p></div>
+                                        )}
+                                    </div>
+                                    <div className="export-section">
+                                        <button className="export-btn" onClick={exportTrainingPDF} disabled={trainingData.items.length === 0}>📥 Esporta PDF Training</button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+</script>
+</body>
+</html>
